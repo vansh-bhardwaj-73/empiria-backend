@@ -30,20 +30,48 @@ app.add_middleware(
 def calculate_csi(attendance, internal_avg, certifications):
     return round((attendance * 0.4) + (internal_avg * 0.4) + (certifications * 10), 2)
 
-@app.get("/students_with_csi")
-def students_with_csi():
+@app.get("/student_intelligence")
+def student_intelligence():
     records = students_sheet.get_all_records()
     results = []
+
     for r in records:
-        csi = calculate_csi(int(r["attendance"]), int(r["internal_avg"]), int(r["certifications"]))
+        att = int(r.get("attendance", 0))
+        avg = int(r.get("internal_avg", 0))
+        cert = int(r.get("certifications", 0))
+
+        csi = calculate_csi(att, avg, cert)
         status = "Stable" if csi >= 80 else "At Risk" if csi >= 60 else "Critical"
+
+        reasons = explain_csi(att, avg, cert)
+        days_critical, days_save = risk_timeline(att, avg, cert, csi)
+        roadmap = branch_roadmap(r.get("branch",""), reasons)
+        weak, dom, path, emp = skill_intelligence(r.get("branch",""), cert, csi)
+
+        priority_score = round((80 - csi) * (2 if cert == 0 else 1) * (1.5 if att < 70 else 1), 2)
+
         results.append({
-            "name": r["name"],
-            "branch": r["branch"],
+            "id": r.get("id",""),
+            "name": r.get("name",""),
+            "branch": r.get("branch",""),
             "csi": csi,
-            "status": status
+            "status": status,
+
+            "reasons": reasons,
+            "critical_in_days": days_critical,
+            "days_to_save": days_save,
+
+            "priority_score": priority_score,
+            "roadmap": roadmap,
+
+            "weak_skills": weak,
+            "dominant_skill": dom,
+            "success_path": path,
+            "employability_score": emp
         })
+
     return results
+
 
 @app.get("/kpi_summary")
 def kpi_summary():
@@ -95,3 +123,77 @@ def assistant(query: dict):
         avg = sum(calculate_csi(int(s["attendance"]), int(s["internal_avg"]), int(s["certifications"])) for s in students) / len(students)
         return {"reply": f"Institution Health Score is {round(avg,2)}"}
     return {"reply": "Ask about: at risk, critical, skills, health"}
+
+def explain_csi(att, avg, cert):
+    reasons = []
+    if att < 75:
+        reasons.append("Low attendance")
+    if avg < 65:
+        reasons.append("Low internal marks")
+    if cert == 0:
+        reasons.append("No certifications")
+    if not reasons:
+        reasons.append("Healthy performance")
+    return reasons
+
+####Risk timeline####
+def risk_timeline(att, avg, cert, csi):
+    cert_gap = 1 if cert == 0 else 0
+
+    decay_rate = ((75 - att)/2 + (65 - avg) + (cert_gap * 10)) / 30
+    decay_rate = max(decay_rate, 0.5)
+
+    days_to_critical = round((csi - 59) / decay_rate, 1)
+    days_to_critical = max(0, min(120, days_to_critical))
+
+    recovery_rate = 1 + (cert * 0.3)
+    days_to_save = round((80 - csi) / recovery_rate, 1)
+    days_to_save = max(0, min(90, days_to_save))
+
+    return days_to_critical, days_to_save
+
+##Branch roadmap engine##
+def branch_roadmap(branch, reasons):
+    base = {
+        "cse": ["Python", "DSA", "SQL", "Git", "Internship"],
+        "aiml": ["Python", "ML", "DL", "SQL", "Internship"],
+        "ece": ["Embedded C", "IoT", "MATLAB"],
+        "mech": ["SolidWorks", "Manufacturing"],
+        "civil": ["AutoCAD", "ETABS", "STAAD"],
+        "eee": ["PLC", "SCADA", "MATLAB"]
+    }
+
+    roadmap = base.get(branch.lower(), ["Soft Skills", "Internship"])
+
+    if "Low attendance" in reasons:
+        roadmap.insert(0, "Attendance mentoring")
+    if "Low internal marks" in reasons:
+        roadmap.insert(0, "Core subject revision")
+    if "No certifications" in reasons:
+        roadmap.insert(0, "Mandatory certification")
+
+    return roadmap
+
+####Skill intelligence engine####
+def skill_intelligence(branch, cert, csi):
+    skill_map = {
+        "cse": ["Python", "DSA", "SQL", "Git", "Internship"],
+        "aiml": ["Python", "ML", "DL", "SQL", "Internship"],
+        "ece": ["Embedded C", "IoT", "MATLAB"],
+        "mech": ["SolidWorks", "Manufacturing"],
+    }
+
+    weights = {
+        "Python":1.2, "DSA":1.4, "ML":1.3, "SQL":1.1,
+        "Internship":1.5, "Git":1.0, "DL":1.2
+    }
+
+    skills = skill_map.get(branch.lower(), ["Soft Skills"])
+    dominant = skills[0]
+    employability = min(100, int((csi + cert*10) * weights.get(dominant,1)))
+
+    weak = skills[2:] if cert > 0 else skills
+    success_path = f"Can succeed via {dominant}-centric roles"
+
+    return weak, dominant, success_path, employability
+
