@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import gspread
+import os, json
 from google.oauth2.service_account import Credentials
 
 scope = [
@@ -8,11 +9,8 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-import os, json
-creds = Credentials.from_service_account_info(
-    json.loads(os.environ["GOOGLE_CREDS"]), scopes=scope
-)
-
+creds_info = json.loads(os.environ["GOOGLE_CREDS_JSON"])
+creds = Credentials.from_service_account_info(creds_info, scopes=scope)
 client = gspread.authorize(creds)
 
 sheet = client.open("EMPIRIA_DB")
