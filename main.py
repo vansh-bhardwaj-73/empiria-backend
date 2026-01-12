@@ -8,7 +8,11 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = Credentials.from_service_account_file("serviceAccountKey.json", scopes=scope)
+import os, json
+creds = Credentials.from_service_account_info(
+    json.loads(os.environ["GOOGLE_CREDS"]), scopes=scope
+)
+
 client = gspread.authorize(creds)
 
 sheet = client.open("EMPIRIA_DB")
