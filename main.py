@@ -50,6 +50,8 @@ def student_intelligence():
 
         priority_score = round((80 - csi) * (2 if cert == 0 else 1) * (1.5 if att < 70 else 1), 2)
 
+        job_data = predict_roles_and_salary(csi, dom)
+
         results.append({
             "id": r.get("id",""),
             "name": r.get("name",""),
@@ -67,12 +69,51 @@ def student_intelligence():
             "weak_skills": weak,
             "dominant_skill": dom,
             "success_path": path,
-            "employability_score": emp
+            "employability_score": emp,
+
+            "job_roles": job_data["roles"],
+            "salary_band": job_data["salary_range"],
+            "survival_track": branch_survival_track(r.get("branch","")),
+            "income_timeline": salary_time_estimator(priority_score)
         })
 
     return results
 
+##############################################################
+def predict_roles_and_salary(csi, dominant_skill):
+    if dominant_skill == "Python":
+        return {
+            "roles": ["Backend Developer", "Data Analyst", "Automation Engineer"],
+            "salary_range": "₹4–12 LPA"
+        }
+    if dominant_skill == "ML":
+        return {
+            "roles": ["ML Engineer", "AI Analyst"],
+            "salary_range": "₹6–18 LPA"
+        }
+    return {
+        "roles": ["IT Support", "QA Intern"],
+        "salary_range": "₹2–5 LPA"
+    }
 
+def branch_survival_track(branch):
+    tracks = {
+        "CSE": ["Python","DSA","Backend","Internship"],
+        "AIML": ["Python","ML","Projects","Kaggle","Internship"],
+        "Data Science": ["Python","SQL","Pandas","Visualization","Internship"],
+        "IT": ["Python","Git","Linux","Internship"]
+    }
+    return tracks.get(branch, ["Python","Git","Linux","Internship"])
+
+def salary_time_estimator(priority_score):
+    if priority_score < 10:
+        return "2–3 months"
+    elif priority_score < 15:
+        return "4–6 months"
+    else:
+        return "6–9 months"
+
+##############################################################
 @app.get("/kpi_summary")
 def kpi_summary():
     records = students_sheet.get_all_records()
@@ -196,4 +237,3 @@ def skill_intelligence(branch, cert, csi):
     success_path = f"Can succeed via {dominant}-centric roles"
 
     return weak, dominant, success_path, employability
-
