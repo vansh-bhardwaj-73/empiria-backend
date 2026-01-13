@@ -418,3 +418,24 @@ def certificate_credibility(cert_type, cert_source):
     if cert_source.lower() in premium_sources:
         return 1.0, "HIGH CREDIBILITY"
     return 0.4, "LOW CREDIBILITY"
+
+#############################
+def log_real_outcome(student_id, placed, salary, days_taken):
+    log = sheet.worksheet("outcomes")
+    log.append_row([student_id, placed, salary, days_taken])
+#####Learning engine##############
+def self_learning_adjuster():
+    log = sheet.worksheet("outcomes").get_all_records()
+    if not log:
+        return
+
+    avg_salary = sum(int(r["salary"]) for r in log if r["placed"]) / max(1, len([r for r in log if r["placed"]]))
+    # placeholder learning logic
+    if avg_salary < 500000:
+        # future: auto reduce CSI weight on weak certs
+        pass
+#####################################
+@app.post("/outcome_feedback")
+def outcome_feedback(data: dict):
+    log_real_outcome(data["id"], data["placed"], data["salary"], data["days"])
+    return {"status":"Recorded"}
