@@ -278,3 +278,35 @@ def batch_heatmap():
         "distribution": heatmap,
         "risk_percentage": round((heatmap["Critical"] / total) * 100, 2) if total else 0
     }
+###################Mentor Assignment Engine####################
+@app.get("/mentor_queue")
+def mentor_queue():
+    records = students_sheet.get_all_records()
+    queue = []
+
+    for r in records:
+        att = int(r["attendance"])
+        avg = int(r["internal_avg"])
+        cert = int(r["certifications"])
+
+        csi = calculate_csi(att, avg, cert)
+        days_critical, _ = risk_timeline(att, avg, cert, csi)
+        drop_prob, urgency = dropout_engine(att, avg, cert, csi, days_critical)
+
+        if urgency == "HIGH":
+            queue.append({
+                "name": r["name"],
+                "branch": r["branch"],
+                "urgency": urgency,
+                "action": "Immediate personal mentoring"
+            })
+        elif urgency == "MEDIUM":
+            queue.append({
+                "name": r["name"],
+                "branch": r["branch"],
+                "urgency": urgency,
+                "action": "Group mentoring + certification plan"
+            })
+
+    return queue
+
