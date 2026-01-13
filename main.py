@@ -63,6 +63,7 @@ def student_intelligence():
         drop_prob, urgency = dropout_engine(att, avg, cert_score, csi, days_critical)
         roadmap = branch_roadmap(r.get("branch",""), reasons)
         weak, dom, path, emp = skill_intelligence(r.get("branch",""), cert_score, csi)
+        daily_plan = daily_recovery_planner(r.get("branch",""), reasons, days_save, dom)
         placement_prob = placement_probability_engine(csi, emp)
 
         priority_score = round((80 - csi) * (2 if cert_score < 7 else 1) * (1.5 if att < 70 else 1), 2)
@@ -90,6 +91,7 @@ def student_intelligence():
             "success_path": path,
             "employability_score": emp,
             "placement_probability": placement_prob,
+            "daily_recovery_plan": daily_plan,
 
             "job_roles": job_data["roles"],
             "salary_band": job_data["salary_range"],
@@ -152,6 +154,35 @@ def dropout_engine(att, avg, cert_score, csi, days_critical):
         rescue_urgency = "MEDIUM"
 
     return dropout_prob, rescue_urgency
+##############################################################
+def daily_recovery_planner(branch, reasons, days_to_save, dominant_skill):
+    plan = []
+
+    if "Low attendance" in reasons:
+        plan.append({"task":"Attend all classes", "hours":6})
+
+    if "Low internal marks" in reasons:
+        plan.append({"task":"Revise core subjects", "hours":3})
+
+    if "Low quality certifications" in reasons:
+        plan.append({"task":"Complete one professional certificate", "hours":2})
+
+    # Skill track
+    if dominant_skill == "Python":
+        plan.append({"task":"Python practice", "hours":2})
+    elif dominant_skill == "ML":
+        plan.append({"task":"ML model building", "hours":2})
+    else:
+        plan.append({"task":"Technical skill building", "hours":2})
+
+    plan.append({"task":"Mock interview / Resume improvement", "hours":1})
+
+    return {
+        "daily_hours_required": sum(p["hours"] for p in plan),
+        "days_required": int(days_to_save),
+        "daily_plan": plan
+    }
+
 
 ##############################################################
 @app.get("/kpi_summary")
