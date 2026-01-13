@@ -45,6 +45,7 @@ def student_intelligence():
 
         reasons = explain_csi(att, avg, cert)
         days_critical, days_save = risk_timeline(att, avg, cert, csi)
+        drop_prob, urgency = dropout_engine(att, avg, cert, csi, days_critical)
         roadmap = branch_roadmap(r.get("branch",""), reasons)
         weak, dom, path, emp = skill_intelligence(r.get("branch",""), cert, csi)
 
@@ -61,6 +62,8 @@ def student_intelligence():
 
             "reasons": reasons,
             "critical_in_days": days_critical,
+            "dropout_probability": drop_prob,
+            "rescue_urgency": urgency,
             "days_to_save": days_save,
 
             "priority_score": priority_score,
@@ -112,6 +115,21 @@ def salary_time_estimator(priority_score):
         return "4–6 months"
     else:
         return "6–9 months"
+############################################################
+def dropout_engine(att, avg, cert, csi, days_critical):
+    dropout_prob = round(
+        ((80 - csi) + (75 - att) + (65 - avg) + (1 if cert == 0 else 0)*20) / 2,
+        2
+    )
+    dropout_prob = max(0, min(100, dropout_prob))
+
+    rescue_urgency = "LOW"
+    if days_critical < 30:
+        rescue_urgency = "HIGH"
+    elif days_critical < 60:
+        rescue_urgency = "MEDIUM"
+
+    return dropout_prob, rescue_urgency
 
 ##############################################################
 @app.get("/kpi_summary")
