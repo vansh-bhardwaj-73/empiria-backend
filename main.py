@@ -255,3 +255,26 @@ def skill_intelligence(branch, cert, csi):
     success_path = f"Can succeed via {dominant}-centric roles"
 
     return weak, dominant, success_path, employability
+
+##########heatmap API###############
+@app.get("/batch_heatmap")
+def batch_heatmap():
+    records = students_sheet.get_all_records()
+
+    heatmap = {"Stable": 0, "At Risk": 0, "Critical": 0}
+    total = len(records)
+
+    for r in records:
+        csi = calculate_csi(int(r["attendance"]), int(r["internal_avg"]), int(r["certifications"]))
+        if csi >= 80:
+            heatmap["Stable"] += 1
+        elif csi >= 60:
+            heatmap["At Risk"] += 1
+        else:
+            heatmap["Critical"] += 1
+
+    return {
+        "total_students": total,
+        "distribution": heatmap,
+        "risk_percentage": round((heatmap["Critical"] / total) * 100, 2) if total else 0
+    }
