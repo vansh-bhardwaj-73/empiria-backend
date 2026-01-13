@@ -27,8 +27,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def calculate_csi(attendance, internal_avg, certifications):
-    return round((attendance * 0.4) + (internal_avg * 0.4) + (certifications * 10), 2)
+def certificate_score(cert_type):
+    return certificate_weight(cert_type) * 10
+
+def calculate_csi(att, avg, cert_type):
+    return round((att * 0.4) + (avg * 0.4) + certificate_score(cert_type), 2)
+
+
+def certificate_weight(cert_type):
+    weights = {
+        "professional": 1.0,     # Google, AWS, IBM, Microsoft
+        "short_program": 0.7,    # Coursera, NPTEL, Udemy
+        "workshop": 0.4,         # 1–3 day workshops
+        "conference": 0.3,       # Paper / Attendee
+        "student_coordinator": 0.2
+    }
+    return weights.get(cert_type.lower(), 0.2)
+
 
 @app.get("/student_intelligence")
 def student_intelligence():
@@ -38,19 +53,19 @@ def student_intelligence():
     for r in records:
         att = int(r.get("attendance", 0))
         avg = int(r.get("internal_avg", 0))
-        cert = int(r.get("certifications", 0))
-
-        csi = calculate_csi(att, avg, cert)
+        cert_type = r.get("cert_type","student_coordinator")
+        cert_score = certificate_score(cert_type)
+        csi = calculate_csi(att, avg, cert_type)
         status = "Stable" if csi >= 80 else "At Risk" if csi >= 60 else "Critical"
 
-        reasons = explain_csi(att, avg, cert)
-        days_critical, days_save = risk_timeline(att, avg, cert, csi)
-        drop_prob, urgency = dropout_engine(att, avg, cert, csi, days_critical)
+        reasons = explain_csi(att, avg, cert_score)
+        days_critical, days_save = risk_timeline(att, avg, cert_score, csi)
+        drop_prob, urgency = dropout_engine(att, avg, cert_score, csi, days_critical)
         roadmap = branch_roadmap(r.get("branch",""), reasons)
-        weak, dom, path, emp = skill_intelligence(r.get("branch",""), cert, csi)
+        weak, dom, path, emp = skill_intelligence(r.get("branch",""), cert_score, csi)
         placement_prob = placement_probability_engine(csi, emp)
 
-        priority_score = round((80 - csi) * (2 if cert == 0 else 1) * (1.5 if att < 70 else 1), 2)
+        priority_score = round((80 - csi) * (2 if cert_score < 7 else 1) * (1.5 if att < 70 else 1), 2)
 
         job_data = predict_roles_and_salary(csi, dom)
 
@@ -123,9 +138,9 @@ def placement_probability_engine(csi, employability_score):
     return max(0, min(100, prob))
 
 ############################################################
-def dropout_engine(att, avg, cert, csi, days_critical):
+def dropout_engine(att, avg, cert_score, csi, days_critical):
     dropout_prob = round(
-        ((80 - csi) + (75 - att) + (65 - avg) + (1 if cert == 0 else 0)*20) / 2,
+        ((80 - csi) + (75 - att) + (65 - avg) + (1 if cert_score < 7 else 0)*20) / 2,
         2
     )
     dropout_prob = max(0, min(100, dropout_prob))
@@ -145,7 +160,12 @@ def kpi_summary():
     total = len(records)
     stable = at_risk = critical = total_csi = 0
     for r in records:
-        csi = calculate_csi(int(r["attendance"]), int(r["internal_avg"]), int(r["certifications"]))
+        csi = calculate_csi(
+            int(r["attendance"]),
+            int(r["internal_avg"]),
+            r.get("cert_type","student_coordinator")
+            )
+
         total_csi += csi
         if csi >= 80: stable += 1
         elif csi >= 60: at_risk += 1
@@ -166,7 +186,12 @@ def skill_demand():
 def interventions():
     actions = []
     for r in students_sheet.get_all_records():
-        csi = calculate_csi(int(r["attendance"]), int(r["internal_avg"]), int(r["certifications"]))
+        csi = calculate_csi(
+    int(r["attendance"]),
+    int(r["internal_avg"]),
+    r.get("cert_type","student_coordinator")
+)
+
         if csi < 60:
             actions.append({"name": r["name"], "action": "Immediate mentoring + certification push"})
         elif csi < 80:
@@ -190,21 +215,18 @@ def assistant(query: dict):
         return {"reply": f"Institution Health Score is {round(avg,2)}"}
     return {"reply": "Ask about: at risk, critical, skills, health"}
 
-def explain_csi(att, avg, cert):
-    reasons = []
-    if att < 75:
-        reasons.append("Low attendance")
-    if avg < 65:
-        reasons.append("Low internal marks")
-    if cert == 0:
-        reasons.append("No certifications")
-    if not reasons:
-        reasons.append("Healthy performance")
-    return reasons
+def explain_csi(att, avg, cert_score):
+    reasons=[]
+    if att<75: reasons.append("Low attendance")
+    if avg<65: reasons.append("Low internal marks")
+    if cert_score<4: reasons.append("Low quality certifications")
+    return reasons or ["Healthy performance"]
+
 
 ####Risk timeline####
-def risk_timeline(att, avg, cert, csi):
-    cert_gap = 1 if cert == 0 else 0
+def risk_timeline(att, avg, cert_score, csi):
+    cert_gap = 1 if cert_score < 4 else 0
+
 
     decay_rate = ((75 - att)/2 + (65 - avg) + (cert_gap * 10)) / 30
     decay_rate = max(decay_rate, 0.5)
@@ -212,7 +234,7 @@ def risk_timeline(att, avg, cert, csi):
     days_to_critical = round((csi - 59) / decay_rate, 1)
     days_to_critical = max(0, min(120, days_to_critical))
 
-    recovery_rate = 1 + (cert * 0.3)
+    recovery_rate = 1 + (cert_score * 0.3)
     days_to_save = round((80 - csi) / recovery_rate, 1)
     days_to_save = max(0, min(90, days_to_save))
 
@@ -241,7 +263,7 @@ def branch_roadmap(branch, reasons):
     return roadmap
 
 ####Skill intelligence engine####
-def skill_intelligence(branch, cert, csi):
+def skill_intelligence(branch, cert_score, csi):
     skill_map = {
         "cse": ["Python", "DSA", "SQL", "Git", "Internship"],
         "aiml": ["Python", "ML", "DL", "SQL", "Internship"],
@@ -256,9 +278,9 @@ def skill_intelligence(branch, cert, csi):
 
     skills = skill_map.get(branch.lower(), ["Soft Skills"])
     dominant = skills[0]
-    employability = min(100, int((csi + cert*10) * weights.get(dominant,1)))
-
-    weak = skills[2:] if cert > 0 else skills
+    cert_weight = cert_score / 10
+    employability = min(100, int((csi + cert_score) * weights.get(dominant,1)))
+    weak = skills[2:] if cert_score > 4 else skills
     success_path = f"Can succeed via {dominant}-centric roles"
 
     return weak, dominant, success_path, employability
@@ -272,7 +294,12 @@ def batch_heatmap():
     total = len(records)
 
     for r in records:
-        csi = calculate_csi(int(r["attendance"]), int(r["internal_avg"]), int(r["certifications"]))
+        csi = calculate_csi(
+    int(r["attendance"]),
+    int(r["internal_avg"]),
+    r.get("cert_type","student_coordinator")
+)
+
         if csi >= 80:
             heatmap["Stable"] += 1
         elif csi >= 60:
@@ -294,11 +321,12 @@ def mentor_queue():
     for r in records:
         att = int(r["attendance"])
         avg = int(r["internal_avg"])
-        cert = int(r["certifications"])
+        cert_type = r.get("cert_type","student_coordinator")
+        cert_score = certificate_score(cert_type)
+        csi = calculate_csi(att, avg, cert_type)
 
-        csi = calculate_csi(att, avg, cert)
-        days_critical, _ = risk_timeline(att, avg, cert, csi)
-        drop_prob, urgency = dropout_engine(att, avg, cert, csi, days_critical)
+        days_critical, _ = risk_timeline(att, avg, cert_score, csi)
+        drop_prob, urgency = dropout_engine(att, avg, cert_score, csi, days_critical)
 
         if urgency == "HIGH":
             queue.append({
