@@ -65,6 +65,7 @@ def student_intelligence():
         weak, dom, path, emp = skill_intelligence(r.get("branch",""), cert_score, csi)
         daily_plan = daily_recovery_planner(r.get("branch",""), reasons, days_save, dom)
         placement_prob = placement_probability_engine(csi, emp)
+        company_map = company_reality_mapper(dom, csi, emp)
 
         priority_score = round((80 - csi) * (2 if cert_score < 7 else 1) * (1.5 if att < 70 else 1), 2)
 
@@ -92,6 +93,7 @@ def student_intelligence():
             "employability_score": emp,
             "placement_probability": placement_prob,
             "daily_recovery_plan": daily_plan,
+            "company_path": company_map,
 
             "job_roles": job_data["roles"],
             "salary_band": job_data["salary_range"],
@@ -381,3 +383,25 @@ def placement_probability_engine(csi, employability_score):
     prob = round((csi * 0.5 + employability_score * 0.5), 2)
     prob = max(0, min(100, prob))
     return prob
+
+##########Company mapping engine###############
+def company_reality_mapper(dominant_skill, csi, employability):
+    if dominant_skill == "Python":
+        companies = ["TCS", "Accenture", "Infosys", "Zoho"]
+        salary = "₹4–7 LPA" if employability < 80 else "₹7–12 LPA"
+        blockers = ["DSA", "SQL", "Projects"] if employability < 80 else ["System Design"]
+    elif dominant_skill == "ML":
+        companies = ["Fractal", "Tiger Analytics", "Mu Sigma"]
+        salary = "₹6–10 LPA" if employability < 80 else "₹10–18 LPA"
+        blockers = ["Model deployment", "Projects"]
+    else:
+        companies = ["Wipro", "HCL"]
+        salary = "₹2–4 LPA"
+        blockers = ["Core skills"]
+
+    return {
+        "target_companies": companies,
+        "expected_salary": salary,
+        "skill_blockers": blockers
+    }
+##############################################################
