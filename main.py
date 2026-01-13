@@ -48,6 +48,7 @@ def student_intelligence():
         drop_prob, urgency = dropout_engine(att, avg, cert, csi, days_critical)
         roadmap = branch_roadmap(r.get("branch",""), reasons)
         weak, dom, path, emp = skill_intelligence(r.get("branch",""), cert, csi)
+        placement_prob = placement_probability_engine(csi, emp)
 
         priority_score = round((80 - csi) * (2 if cert == 0 else 1) * (1.5 if att < 70 else 1), 2)
 
@@ -73,6 +74,7 @@ def student_intelligence():
             "dominant_skill": dom,
             "success_path": path,
             "employability_score": emp,
+            "placement_probability": placement_prob,
 
             "job_roles": job_data["roles"],
             "salary_band": job_data["salary_range"],
@@ -115,6 +117,11 @@ def salary_time_estimator(priority_score):
         return "4–6 months"
     else:
         return "6–9 months"
+
+def placement_probability_engine(csi, employability_score):
+    prob = round((csi * 0.5 + employability_score * 0.5), 2)
+    return max(0, min(100, prob))
+
 ############################################################
 def dropout_engine(att, avg, cert, csi, days_critical):
     dropout_prob = round(
@@ -310,3 +317,8 @@ def mentor_queue():
 
     return queue
 
+###########Placement Probability Engine############
+def placement_probability_engine(csi, employability_score):
+    prob = round((csi * 0.5 + employability_score * 0.5), 2)
+    prob = max(0, min(100, prob))
+    return prob
