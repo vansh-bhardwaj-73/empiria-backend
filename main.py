@@ -54,8 +54,10 @@ def student_intelligence():
         att = int(r.get("attendance", 0))
         avg = int(r.get("internal_avg", 0))
         cert_type = r.get("cert_type","student_coordinator")
-        cert_score = certificate_score(cert_type)
-        csi = calculate_csi(att, avg, cert_type)
+        cred_weight, cred_tag = certificate_credibility(cert_type, r.get("cert_source","unknown"))
+        cert_score = cred_weight * 10
+        csi = round((att * 0.4) + (avg * 0.4) + cert_score, 2)
+
         status = "Stable" if csi >= 80 else "At Risk" if csi >= 60 else "Critical"
 
         reasons = explain_csi(att, avg, cert_score)
@@ -94,6 +96,7 @@ def student_intelligence():
             "placement_probability": placement_prob,
             "daily_recovery_plan": daily_plan,
             "company_path": company_map,
+            "certificate_credibility": cred_tag,
 
             "job_roles": job_data["roles"],
             "salary_band": job_data["salary_range"],
@@ -405,3 +408,13 @@ def company_reality_mapper(dominant_skill, csi, employability):
         "skill_blockers": blockers
     }
 ##############################################################
+###############Certificate credibility engine##################
+def certificate_credibility(cert_type, cert_source):
+    fake_sources = ["randomsite", "cheapcert", "telegram", "freepdf"]
+    premium_sources = ["google", "microsoft", "aws", "ibm", "nptel", "coursera"]
+
+    if cert_source.lower() in fake_sources:
+        return -0.4, "FAKE / ZERO VALUE"
+    if cert_source.lower() in premium_sources:
+        return 1.0, "HIGH CREDIBILITY"
+    return 0.4, "LOW CREDIBILITY"
