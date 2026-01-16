@@ -25,12 +25,12 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
-SECRET_KEY = os.getenv("EMPIRIA_SECRET", "EMPIRIA_SECURE_KEY_2026")
+SECRET_KEY = os.environ["EMPIRIA_SECRET"]
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 120
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 
 # ==========================================================
@@ -58,6 +58,7 @@ logger = logging.getLogger(APP_NAME)
 REQUIRED_ENV_VARS = [
     "GOOGLE_CREDS_JSON",
     "EMPIRIA_DB_NAME",
+    "EMPIRIA_SECRET",
 ]
 
 for var in REQUIRED_ENV_VARS:
@@ -219,7 +220,7 @@ app.add_middleware(
 )
 @app.post("/login")
 def login(form: OAuth2PasswordRequestForm = Depends()):
-    users = safe_sheet_fetch(users_sheet)
+    users = get_users_data()
 
     user = next((u for u in users if u["username"] == form.username), None)
     if not user or not verify_password(form.password, user["password_hash"]):
@@ -872,7 +873,7 @@ def self_learning_adjuster():
 # ==========================================================
 def role_required(role: str):
     def checker(user=Depends(get_current_user)):
-        if user["role"] != role:
+        if user.get("role") != role:
             raise HTTPException(status_code=403, detail="Access denied")
         return user
     return checker
