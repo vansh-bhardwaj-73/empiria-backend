@@ -86,8 +86,7 @@ def init_google_sheets():
     - Return worksheet handles
     """
     try:
-        with open(os.environ["GOOGLE_CREDS_JSON"], "r") as f:
-            creds_info = json.load(f)
+        creds_info = json.loads(os.environ["GOOGLE_CREDS_JSON"])
 
         creds = Credentials.from_service_account_info(
             creds_info,
